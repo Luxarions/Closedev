@@ -56,6 +56,15 @@ export const DEFAULT_TIMELINE_DURATION = 15;
 export const DEFAULT_ZOOM_LEVEL = 60;
 export const DEFAULT_SNAP_THRESHOLD = 0.15;
 
+export const NeverDepth = 0;
+export const AlwaysDepth = 1;
+export const LessDepth = 2;
+export const LessEqualDepth = 3;
+export const EqualDepth = 4;
+export const GreaterEqualDepth = 5;
+export const GreaterDepth = 6;
+export const NotEqualDepth = 7;
+
 export const ASPECT_RATIO_CONFIGS = {
   '16:9': { name: 'YouTube / Wide (16:9)', ratio: 16 / 9, width: 1920, height: 1080 },
   '9:16': { name: 'TikTok / Reel / Shorts (9:16)', ratio: 9 / 16, width: 1080, height: 1920 },
