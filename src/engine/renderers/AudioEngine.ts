@@ -10,7 +10,7 @@ export class AudioEngine {
     // AudioContext will be initialized on first user gesture
   }
 
-  private initAudioContext(): AudioContext {
+  private _initAudioContext(): AudioContext {
     if (!this.audioCtx) {
       const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       this.audioCtx = new AudioContextClass();
@@ -41,7 +41,7 @@ export class AudioEngine {
     }
 
     try {
-      const ctx = this.initAudioContext();
+      const ctx = this._initAudioContext();
       const response = await fetch(url);
       const arrayBuffer = await response.arrayBuffer();
       const decodedBuffer = await ctx.decodeAudioData(arrayBuffer);
@@ -56,7 +56,7 @@ export class AudioEngine {
    * Synchronizes audio playback for all tracks at time t
    */
   public updateAudioAtTime(tracks: TimelineTrack[], currentTime: number, isPlaying: boolean): void {
-    const ctx = this.initAudioContext();
+    const ctx = this._initAudioContext();
 
     if (!isPlaying) {
       this.stopAllAudio();
@@ -73,7 +73,7 @@ export class AudioEngine {
         const clipEnd = clip.startTime + clip.duration;
         if (currentTime >= clip.startTime && currentTime < clipEnd) {
           activeClipIds.add(clip.id);
-          this.syncClipAudio(clip, track, currentTime, ctx);
+          this._syncClipAudio(clip, track, currentTime, ctx);
         }
       }
     }
@@ -94,14 +94,14 @@ export class AudioEngine {
     }
   }
 
-  private syncClipAudio(clip: TimelineClip, track: TimelineTrack, currentTime: number, ctx: AudioContext): void {
+  private _syncClipAudio(clip: TimelineClip, track: TimelineTrack, currentTime: number, ctx: AudioContext): void {
     if (clip.muted || clip.volume === 0 || !clip.sourceUrl) return;
 
     // Check if source node already running for this clip
     if (this.activeSources.has(clip.id)) {
       // Adjust volume / envelope
       const entry = this.activeSources.get(clip.id)!;
-      this.applyAudioEnvelope(entry.gainNode, clip, currentTime, ctx);
+      this._applyAudioEnvelope(entry.gainNode, clip, currentTime, ctx);
       return;
     }
 
@@ -114,7 +114,7 @@ export class AudioEngine {
         sourceNode.playbackRate.value = clip.playbackRate || 1.0;
 
         const gainNode = ctx.createGain();
-        this.applyAudioEnvelope(gainNode, clip, currentTime, ctx);
+        this._applyAudioEnvelope(gainNode, clip, currentTime, ctx);
 
         sourceNode.connect(gainNode);
         if (this.masterGain) {
@@ -139,7 +139,7 @@ export class AudioEngine {
     }
   }
 
-  private applyAudioEnvelope(gainNode: GainNode, clip: TimelineClip, currentTime: number, ctx: AudioContext): void {
+  private _applyAudioEnvelope(gainNode: GainNode, clip: TimelineClip, currentTime: number, ctx: AudioContext): void {
     const baseVolume = (clip.volume / 100) * (clip.muted ? 0 : 1);
     const clipOffset = currentTime - clip.startTime;
     const clipEndOffset = clip.duration - clipOffset;
