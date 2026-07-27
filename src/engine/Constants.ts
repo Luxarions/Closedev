@@ -2,6 +2,27 @@
  * Version / Revision identification
  */
 export const REVISION = '1.0.0-videoengine';
+export const VERSION = REVISION;
+
+export const MIME_TYPES = {
+  VIDEO_MP4: 'video/mp4',
+  VIDEO_WEBM: 'video/webm',
+  AUDIO_MP3: 'audio/mp3',
+  AUDIO_WAV: 'audio/wav',
+  IMAGE_PNG: 'image/png',
+  IMAGE_JPEG: 'image/jpeg',
+} as const;
+
+export const DEFAULT_FRAMERATE = 30;
+
+export const NeverDepth = 0;
+export const AlwaysDepth = 1;
+export const LessDepth = 2;
+export const LessEqualDepth = 3;
+export const EqualDepth = 4;
+export const GreaterEqualDepth = 5;
+export const GreaterDepth = 6;
+export const NotEqualDepth = 7;
 
 /**
  * Stage 1: Constants.ts
@@ -63,6 +84,12 @@ export const TRACK_TYPE_AUDIO = 'audio' as const;
 export const TRACK_TYPE_TEXT = 'text' as const;
 export const TRACK_TYPE_EFFECT = 'effect' as const;
 export const TRACK_TYPE_STICKER = 'sticker' as const;
+
+export const VIDEO_TRACK_TYPE = TRACK_TYPE_VIDEO;
+export const AUDIO_TRACK_TYPE = TRACK_TYPE_AUDIO;
+export const TEXT_TRACK_TYPE = TRACK_TYPE_TEXT;
+export const EFFECT_TRACK_TYPE = TRACK_TYPE_EFFECT;
+export const STICKER_TRACK_TYPE = TRACK_TYPE_STICKER;
 
 // --- 7. Timeline & Engine Defaults ---
 export const DEFAULT_FPS = 30;
