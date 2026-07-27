@@ -59,13 +59,13 @@ export class CanvasRenderer {
         // Check if clip is active at current timeline time
         if (currentTime >= clip.startTime && currentTime < clipEnd) {
           const clipTime = currentTime - clip.startTime + clip.mediaOffset;
-          this.renderClip(clip, clipTime, currentTime, w, h, selectedClipId === clip.id);
+          this._renderClip(clip, clipTime, currentTime, w, h, selectedClipId === clip.id);
         }
       }
     }
   }
 
-  private renderClip(
+  private _renderClip(
     clip: TimelineClip,
     clipTime: number,
     timelineTime: number,
@@ -95,29 +95,29 @@ export class CanvasRenderer {
 
     // 3. Render content based on type
     if (clip.type === 'video' || clip.type === 'sticker') {
-      this.drawMediaClip(clip, clipTime, canvasW, canvasH);
+      this._drawMediaClip(clip, clipTime, canvasW, canvasH);
     } else if (clip.type === 'text') {
-      this.drawTextClip(clip, clipTime);
+      this._drawTextClip(clip, clipTime);
     }
 
     // 4. Reset filter for overlay effects
     this.ctx.filter = 'none';
 
     // 5. Apply CapCut Effects
-    this.applyEffects(clip, timelineTime, canvasW, canvasH);
+    this._applyEffects(clip, timelineTime, canvasW, canvasH);
 
     // 6. Apply Transition Blending
-    this.applyTransitions(clip, timelineTime, canvasW, canvasH);
+    this._applyTransitions(clip, timelineTime, canvasW, canvasH);
 
     // 7. Render Selection bounding box highlight if selected
     if (isSelected) {
-      this.drawSelectionOutline(clip, canvasW, canvasH);
+      this._drawSelectionOutline(clip, canvasW, canvasH);
     }
 
     this.ctx.restore();
   }
 
-  private drawMediaClip(clip: TimelineClip, clipTime: number, canvasW: number, canvasH: number): void {
+  private _drawMediaClip(clip: TimelineClip, clipTime: number, canvasW: number, canvasH: number): void {
     if (!clip.sourceUrl) return;
 
     if (clip.mediaType === 'image' || clip.type === 'sticker') {
@@ -179,7 +179,7 @@ export class CanvasRenderer {
     }
   }
 
-  private drawTextClip(clip: TimelineClip, clipTime: number): void {
+  private _drawTextClip(clip: TimelineClip, clipTime: number): void {
     const props = clip.textProps;
     if (!props) return;
 
@@ -230,7 +230,7 @@ export class CanvasRenderer {
     this.ctx.fillText(displayText, 0, 0);
   }
 
-  private applyEffects(clip: TimelineClip, timelineTime: number, canvasW: number, canvasH: number): void {
+  private _applyEffects(clip: TimelineClip, timelineTime: number, canvasW: number, canvasH: number): void {
     if (!clip.effects || clip.effects.length === 0) return;
 
     for (const effect of clip.effects) {
@@ -273,7 +273,7 @@ export class CanvasRenderer {
     }
   }
 
-  private applyTransitions(clip: TimelineClip, timelineTime: number, canvasW: number, canvasH: number): void {
+  private _applyTransitions(clip: TimelineClip, timelineTime: number, canvasW: number, canvasH: number): void {
     if (!clip.transitionIn) return;
 
     const transition = clip.transitionIn;
@@ -298,7 +298,7 @@ export class CanvasRenderer {
     }
   }
 
-  private drawSelectionOutline(clip: TimelineClip, canvasW: number, canvasH: number): void {
+  private _drawSelectionOutline(clip: TimelineClip, canvasW: number, canvasH: number): void {
     const boxW = canvasW;
     const boxH = canvasH;
 

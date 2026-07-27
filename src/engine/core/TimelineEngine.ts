@@ -91,7 +91,7 @@ export class TimelineEngine {
       canRedo: false,
     };
 
-    this.saveHistoryState();
+    this._saveHistoryState();
   }
 
   // --- Listener Subscription ---
@@ -101,7 +101,7 @@ export class TimelineEngine {
     return () => this.listeners.delete(listener);
   }
 
-  private notifyListeners(): void {
+  private _notifyListeners(): void {
     const currentState = this.getState();
     this.listeners.forEach((fn) => fn(currentState));
   }
@@ -111,7 +111,7 @@ export class TimelineEngine {
   }
 
   // --- State History (Undo / Redo) ---
-  private saveHistoryState(): void {
+  private _saveHistoryState(): void {
     if (this.state.historyIndex < this.historyStack.length - 1) {
       this.historyStack = this.historyStack.slice(0, this.state.historyIndex + 1);
     }
@@ -120,10 +120,10 @@ export class TimelineEngine {
       this.historyStack.shift();
     }
     this.state.historyIndex = this.historyStack.length - 1;
-    this.updateUndoRedoStatus();
+    this._updateUndoRedoStatus();
   }
 
-  private updateUndoRedoStatus(): void {
+  private _updateUndoRedoStatus(): void {
     this.state.canUndo = this.state.historyIndex > 0;
     this.state.canRedo = this.state.historyIndex < this.historyStack.length - 1;
   }
@@ -132,8 +132,8 @@ export class TimelineEngine {
     if (this.state.canUndo) {
       this.state.historyIndex--;
       this.state = JSON.parse(JSON.stringify(this.historyStack[this.state.historyIndex]));
-      this.updateUndoRedoStatus();
-      this.notifyListeners();
+      this._updateUndoRedoStatus();
+      this._notifyListeners();
     }
   }
 
@@ -141,32 +141,32 @@ export class TimelineEngine {
     if (this.state.canRedo) {
       this.state.historyIndex++;
       this.state = JSON.parse(JSON.stringify(this.historyStack[this.state.historyIndex]));
-      this.updateUndoRedoStatus();
-      this.notifyListeners();
+      this._updateUndoRedoStatus();
+      this._notifyListeners();
     }
   }
 
   // --- Project Settings ---
   public setProjectTitle(title: string): void {
     this.state.project.title = title;
-    this.saveHistoryState();
-    this.notifyListeners();
+    this._saveHistoryState();
+    this._notifyListeners();
   }
 
   public setAspectRatio(aspectRatio: ProjectSettings['aspectRatio']): void {
     this.state.project.aspectRatio = aspectRatio;
-    this.saveHistoryState();
-    this.notifyListeners();
+    this._saveHistoryState();
+    this._notifyListeners();
   }
 
   public setZoomLevel(zoomLevel: number): void {
     this.state.zoomLevel = clamp(zoomLevel, 10, 300);
-    this.notifyListeners();
+    this._notifyListeners();
   }
 
   public toggleSnapToGrid(): void {
     this.state.snapToGrid = !this.state.snapToGrid;
-    this.notifyListeners();
+    this._notifyListeners();
   }
 
   // --- Track Management ---
@@ -184,26 +184,26 @@ export class TimelineEngine {
     };
 
     this.state.tracks.unshift(newTrack);
-    this.reorderTracks();
-    this.saveHistoryState();
-    this.notifyListeners();
+    this._reorderTracks();
+    this._saveHistoryState();
+    this._notifyListeners();
     return newTrack;
   }
 
   public removeTrack(trackId: string): void {
     this.state.tracks = this.state.tracks.filter((t) => t.id !== trackId);
-    this.reorderTracks();
-    this.recalculateTotalDuration();
-    this.saveHistoryState();
-    this.notifyListeners();
+    this._reorderTracks();
+    this._recalculateTotalDuration();
+    this._saveHistoryState();
+    this._notifyListeners();
   }
 
   public toggleTrackMute(trackId: string): void {
     const track = this.state.tracks.find((t) => t.id === trackId);
     if (track) {
       track.muted = !track.muted;
-      this.saveHistoryState();
-      this.notifyListeners();
+      this._saveHistoryState();
+      this._notifyListeners();
     }
   }
 
@@ -211,8 +211,8 @@ export class TimelineEngine {
     const track = this.state.tracks.find((t) => t.id === trackId);
     if (track) {
       track.locked = !track.locked;
-      this.saveHistoryState();
-      this.notifyListeners();
+      this._saveHistoryState();
+      this._notifyListeners();
     }
   }
 
@@ -220,12 +220,12 @@ export class TimelineEngine {
     const track = this.state.tracks.find((t) => t.id === trackId);
     if (track) {
       track.hidden = !track.hidden;
-      this.saveHistoryState();
-      this.notifyListeners();
+      this._saveHistoryState();
+      this._notifyListeners();
     }
   }
 
-  private reorderTracks(): void {
+  private _reorderTracks(): void {
     this.state.tracks.forEach((track, idx) => {
       track.order = this.state.tracks.length - 1 - idx;
     });
@@ -286,9 +286,9 @@ export class TimelineEngine {
 
     track.clips.push(newClip);
     this.state.selectedClipId = newClip.id;
-    this.recalculateTotalDuration();
-    this.saveHistoryState();
-    this.notifyListeners();
+    this._recalculateTotalDuration();
+    this._saveHistoryState();
+    this._notifyListeners();
     return newClip;
   }
 
@@ -320,7 +320,7 @@ export class TimelineEngine {
     // Apply Snapping
     let clampedStartTime = Math.max(0, newStartTime);
     if (this.state.snapToGrid) {
-      clampedStartTime = this.calculateSnappedTime(clampedStartTime, clipId);
+      clampedStartTime = this._calculateSnappedTime(clampedStartTime, clipId);
     }
 
     // Move track reference if changed
@@ -331,29 +331,29 @@ export class TimelineEngine {
     }
 
     foundClip.startTime = clampedStartTime;
-    this.recalculateTotalDuration();
-    this.saveHistoryState();
-    this.notifyListeners();
+    this._recalculateTotalDuration();
+    this._saveHistoryState();
+    this._notifyListeners();
   }
 
   public trimClip(clipId: string, newStartTime: number, newDuration: number): void {
-    const clip = this.getClipById(clipId);
+    const clip = this._getClipById(clipId);
     if (!clip) return;
 
     const clampedDuration = Math.max(0.2, newDuration);
     clip.startTime = Math.max(0, newStartTime);
     clip.duration = clampedDuration;
 
-    this.recalculateTotalDuration();
-    this.saveHistoryState();
-    this.notifyListeners();
+    this._recalculateTotalDuration();
+    this._saveHistoryState();
+    this._notifyListeners();
   }
 
   public splitClipAtPlayhead(clipId?: string): void {
     const targetClipId = clipId || this.state.selectedClipId;
     if (!targetClipId) return;
 
-    const clip = this.getClipById(targetClipId);
+    const clip = this._getClipById(targetClipId);
     if (!clip) return;
 
     const currentTime = this.state.currentTime;
@@ -380,9 +380,9 @@ export class TimelineEngine {
     track.clips.push(splitClip);
     this.state.selectedClipId = splitClip.id;
 
-    this.recalculateTotalDuration();
-    this.saveHistoryState();
-    this.notifyListeners();
+    this._recalculateTotalDuration();
+    this._saveHistoryState();
+    this._notifyListeners();
   }
 
   public deleteSelectedClip(): void {
@@ -398,14 +398,14 @@ export class TimelineEngine {
     }
 
     this.state.selectedClipId = null;
-    this.recalculateTotalDuration();
-    this.saveHistoryState();
-    this.notifyListeners();
+    this._recalculateTotalDuration();
+    this._saveHistoryState();
+    this._notifyListeners();
   }
 
   public duplicateSelectedClip(): void {
     if (!this.state.selectedClipId) return;
-    const clip = this.getClipById(this.state.selectedClipId);
+    const clip = this._getClipById(this.state.selectedClipId);
     if (!clip) return;
 
     const track = this.state.tracks.find((t) => t.id === clip.trackId);
@@ -417,79 +417,79 @@ export class TimelineEngine {
 
     track.clips.push(dupClip);
     this.state.selectedClipId = dupClip.id;
-    this.recalculateTotalDuration();
-    this.saveHistoryState();
-    this.notifyListeners();
+    this._recalculateTotalDuration();
+    this._saveHistoryState();
+    this._notifyListeners();
   }
 
   // --- Clip Property Modifications ---
   public updateClipTransform(clipId: string, transform: Partial<TransformProps>): void {
-    const clip = this.getClipById(clipId);
+    const clip = this._getClipById(clipId);
     if (clip) {
       clip.transform = { ...clip.transform, ...transform };
-      this.saveHistoryState();
-      this.notifyListeners();
+      this._saveHistoryState();
+      this._notifyListeners();
     }
   }
 
   public updateClipFilters(clipId: string, filters: Partial<FilterProps>): void {
-    const clip = this.getClipById(clipId);
+    const clip = this._getClipById(clipId);
     if (clip) {
       clip.filters = { ...clip.filters, ...filters };
-      this.saveHistoryState();
-      this.notifyListeners();
+      this._saveHistoryState();
+      this._notifyListeners();
     }
   }
 
   public updateClipTextProps(clipId: string, textProps: Partial<TextProperties>): void {
-    const clip = this.getClipById(clipId);
+    const clip = this._getClipById(clipId);
     if (clip && clip.textProps) {
       clip.textProps = { ...clip.textProps, ...textProps };
-      this.saveHistoryState();
-      this.notifyListeners();
+      this._saveHistoryState();
+      this._notifyListeners();
     }
   }
 
   public addEffectToClip(clipId: string, effect: AppliedEffect): void {
-    const clip = this.getClipById(clipId);
+    const clip = this._getClipById(clipId);
     if (clip) {
       clip.effects.push(effect);
-      this.saveHistoryState();
-      this.notifyListeners();
+      this._saveHistoryState();
+      this._notifyListeners();
     }
   }
 
   public removeEffectFromClip(clipId: string, effectId: string): void {
-    const clip = this.getClipById(clipId);
+    const clip = this._getClipById(clipId);
     if (clip) {
       clip.effects = clip.effects.filter((e) => e.id !== effectId);
-      this.saveHistoryState();
-      this.notifyListeners();
+      this._saveHistoryState();
+      this._notifyListeners();
     }
   }
 
   public setClipTransitionIn(clipId: string, transition: AppliedTransition | undefined): void {
-    const clip = this.getClipById(clipId);
+    const clip = this._getClipById(clipId);
     if (clip) {
       clip.transitionIn = transition;
-      this.saveHistoryState();
-      this.notifyListeners();
+      this._saveHistoryState();
+      this._notifyListeners();
     }
   }
 
   // --- Selection & Current Time ---
   public selectClip(clipId: string | null): void {
     this.state.selectedClipId = clipId;
-    this.notifyListeners();
+    this._notifyListeners();
   }
 
   public setCurrentTime(time: number): void {
     this.state.currentTime = clamp(time, 0, this.state.duration);
-    this.notifyListeners();
+    this._notifyListeners();
   }
 
   // --- Helpers ---
-  private getClipById(clipId: string): TimelineClip | undefined {
+  private _getClipById(clipId: string): TimelineClip | undefined {
     for (const track of this.state.tracks) {
       const clip = track.clips.find((c) => c.id === clipId);
       if (clip) return clip;
@@ -497,7 +497,7 @@ export class TimelineEngine {
     return undefined;
   }
 
-  private recalculateTotalDuration(): void {
+  private _recalculateTotalDuration(): void {
     let maxTime = 15; // Minimum timeline duration
     for (const track of this.state.tracks) {
       for (const clip of track.clips) {
@@ -507,7 +507,7 @@ export class TimelineEngine {
     this.state.duration = Math.ceil(maxTime);
   }
 
-  private calculateSnappedTime(time: number, ignoreClipId: string): number {
+  private _calculateSnappedTime(time: number, ignoreClipId: string): number {
     const snapThreshold = 0.3; // 300ms threshold
     let nearestTime = time;
     let minDiff = snapThreshold;

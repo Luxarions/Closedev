@@ -14,7 +14,7 @@ export class PlaybackEngine {
     if (this.isPlaying) return;
     this.isPlaying = true;
     this.lastTickTime = performance.now();
-    this.tick();
+    this._tick();
   }
 
   public pause(): void {
@@ -51,7 +51,7 @@ export class PlaybackEngine {
     return this.isPlaying;
   }
 
-  private tick = (): void => {
+  private _tick = (): void => {
     if (!this.isPlaying) return;
 
     const now = performance.now();
@@ -68,6 +68,6 @@ export class PlaybackEngine {
       this.timelineEngine.setCurrentTime(nextTime);
     }
 
-    this.animFrameId = requestAnimationFrame(this.tick);
+    this.animFrameId = requestAnimationFrame(this._tick);
   };
 }
