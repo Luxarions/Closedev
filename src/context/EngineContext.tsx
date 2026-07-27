@@ -1,13 +1,13 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { TimelineEngine } from '../engine/core/TimelineEngine';
 import { PlaybackEngine } from '../engine/core/PlaybackEngine';
-import { AssetStoreService } from '../engine/services/AssetStore';
+import { AssetStore } from '../engine/services/AssetStore';
 import { ExportEngine } from '../engine/renderers/ExportEngine';
 
 interface EngineContextType {
   timelineEngine: TimelineEngine;
   playbackEngine: PlaybackEngine;
-  assetStore: AssetStoreService;
+  assetStore: AssetStore;
   exportEngine: ExportEngine;
 }
 
@@ -17,7 +17,7 @@ export const EngineProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const engines = useMemo(() => {
     const timelineEngine = new TimelineEngine();
     const playbackEngine = new PlaybackEngine(timelineEngine);
-    const assetStore = AssetStoreService.getInstance();
+    const assetStore = AssetStore.getInstance();
     const exportEngine = new ExportEngine();
 
     assetStore.initializeDefaults();

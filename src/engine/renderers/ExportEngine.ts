@@ -1,6 +1,8 @@
 import { EngineState, AspectRatio } from '../types/timeline';
 import { CanvasRenderer } from './CanvasRenderer';
 import { AudioEngine } from './AudioEngine';
+import { FrameRecorder } from './export/FrameRecorder';
+import { ProgressTracker } from './export/ProgressTracker';
 
 export interface ExportProgress {
   status: 'idle' | 'rendering' | 'completed' | 'error';
@@ -12,7 +14,19 @@ export interface ExportProgress {
 }
 
 export class ExportEngine {
-  private isExporting = false;
+  private _frameRecorder: FrameRecorder;
+  private _progressTracker: ProgressTracker;
+  private _isExporting = false;
+
+  public constructor() {
+    this._frameRecorder = new FrameRecorder();
+    this._progressTracker = new ProgressTracker();
+  }
+
+  public cancelExport(): void {
+    this._progressTracker._cancel();
+    this._isExporting = false;
+  }
 
   public async exportVideo(
     state: EngineState,
@@ -20,11 +34,13 @@ export class ExportEngine {
     fps: number = 30,
     onProgress: (progress: ExportProgress) => void
   ): Promise<string> {
-    if (this.isExporting) {
+    if (this._isExporting) {
       throw new Error('Ekspor sedang berjalan.');
     }
 
-    this.isExporting = true;
+    this._isExporting = true;
+    this._progressTracker._reset();
+
     const totalDuration = Math.max(1, state.duration);
     const totalFrames = Math.ceil(totalDuration * fps);
 
@@ -43,83 +59,61 @@ export class ExportEngine {
       audioStream.getAudioTracks().forEach((track) => canvasStream.addTrack(track));
     }
 
-    let mimeType = 'video/webm;codecs=vp9';
-    if (!MediaRecorder.isTypeSupported(mimeType)) {
-      mimeType = 'video/webm';
-    }
-
-    const mediaRecorder = new MediaRecorder(canvasStream, { mimeType });
-    const chunks: Blob[] = [];
-
-    mediaRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunks.push(e.data);
-    };
+    this._frameRecorder._startRecording(canvasStream);
 
     return new Promise((resolve, reject) => {
-      mediaRecorder.onstop = () => {
-        this.isExporting = false;
-        const finalBlob = new Blob(chunks, { type: mimeType });
-        const downloadUrl = URL.createObjectURL(finalBlob);
-        onProgress({
-          status: 'completed',
-          progressPercent: 100,
-          currentFrame: totalFrames,
-          totalFrames,
-          downloadUrl,
-        });
-        resolve(downloadUrl);
-      };
-
-      mediaRecorder.onerror = (e) => {
-        this.isExporting = false;
-        const errorMessage = `Gagal mengekspor video: ${e.error?.message || 'Error tidak diketahui'}`;
-        onProgress({
-          status: 'error',
-          progressPercent: 0,
-          currentFrame: 0,
-          totalFrames,
-          errorMessage,
-        });
-        reject(new Error(errorMessage));
-      };
-
-      mediaRecorder.start(100);
-
       let currentFrame = 0;
-      const frameInterval = 1000 / fps;
+      const frameDuration = 1 / fps;
 
-      const renderStep = async () => {
-        if (currentFrame >= totalFrames || !this.isExporting) {
-          mediaRecorder.stop();
+      const renderNextFrame = async () => {
+        if (this._progressTracker._isAborted()) {
+          this._frameRecorder._stopRecording();
+          audioEngine.dispose();
+          this._isExporting = false;
+          reject(new Error('Ekspor dibatalkan.'));
           return;
         }
 
-        const currentTime = currentFrame / fps;
+        if (currentFrame >= totalFrames) {
+          audioEngine.stopAllAudio();
+          const finalBlob = await this._frameRecorder._stopRecording();
+          audioEngine.dispose();
+          this._isExporting = false;
 
-        // Render visual frame
-        canvasRenderer.renderFrame(state.tracks, currentTime, aspectRatio, null);
+          const downloadUrl = URL.createObjectURL(finalBlob);
+          onProgress({
+            status: 'completed',
+            progressPercent: 100,
+            currentFrame: totalFrames,
+            totalFrames,
+            downloadUrl,
+          });
+          resolve(downloadUrl);
+          return;
+        }
 
-        // Render audio
+        const currentTime = currentFrame * frameDuration;
+
+        // Render Canvas Frame
+        canvasRenderer.renderFrame(state.tracks, currentTime, aspectRatio);
+
+        // Sync Audio
         audioEngine.updateAudioAtTime(state.tracks, currentTime, true);
 
         currentFrame++;
-        const progressPercent = Math.round((currentFrame / totalFrames) * 100);
+        const percent = this._progressTracker._calculatePercent(currentFrame, totalFrames);
 
         onProgress({
           status: 'rendering',
-          progressPercent,
+          progressPercent: percent,
           currentFrame,
           totalFrames,
         });
 
-        setTimeout(renderStep, frameInterval / 2); // Accelerate rendering
+        setTimeout(renderNextFrame, Math.round(frameDuration * 1000));
       };
 
-      renderStep();
+      renderNextFrame();
     });
-  }
-
-  public cancelExport(): void {
-    this.isExporting = false;
   }
 }

@@ -37,7 +37,7 @@ export const TimelineTrack: React.FC<TimelineTrackProps> = ({
     // Case 1: Dragged clip reordering on timeline
     const movedClipId = e.dataTransfer.getData('capcut/clipId');
     if (movedClipId) {
-      timelineEngine.moveClip(movedClipId, dropTime, track.id);
+      timelineEngine.moveClip(movedClipId, track.id, dropTime);
       return;
     }
 
@@ -54,20 +54,46 @@ export const TimelineTrack: React.FC<TimelineTrackProps> = ({
           const preparedUrl = await assetStore.getPreparedMediaAssetUrl(asset.id);
 
           timelineEngine.addClipToTrack(track.id, {
+            trackId: track.id,
             name: asset.title,
+            type: track.type,
             sourceUrl: preparedUrl || asset.url,
             thumbnailUrl: asset.thumbnailUrl,
             duration: asset.duration || 8,
             startTime: dropTime,
+            mediaOffset: 0,
+            mediaDuration: asset.duration || 8,
             mediaType: asset.type === 'image' ? 'image' : asset.type === 'audio' ? 'audio' : 'video',
+            transform: { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 },
+            volume: 100,
+            muted: false,
+            fadeInDuration: 0,
+            fadeOutDuration: 0,
+            playbackRate: 1.0,
+            filters: { brightness: 100, contrast: 100, saturate: 100, hueRotate: 0, blur: 0, sepia: 0, temperature: 0 },
+            effects: [],
+            keyframes: [],
           });
         } else if (itemType === 'text') {
           const preset = payload as TextPreset;
           timelineEngine.addClipToTrack(track.id, {
+            trackId: track.id,
             name: preset.name,
+            type: 'text',
             sourceUrl: '',
             duration: 4,
             startTime: dropTime,
+            mediaOffset: 0,
+            mediaDuration: 4,
+            transform: { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 },
+            volume: 100,
+            muted: false,
+            fadeInDuration: 0,
+            fadeOutDuration: 0,
+            playbackRate: 1.0,
+            filters: { brightness: 100, contrast: 100, saturate: 100, hueRotate: 0, blur: 0, sepia: 0, temperature: 0 },
+            effects: [],
+            keyframes: [],
             textProps: {
               content: preset.content,
               fontFamily: preset.fontFamily,

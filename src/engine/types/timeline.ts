@@ -57,6 +57,10 @@ export interface TextProperties {
   bold: boolean;
   italic: boolean;
   animationStyle?: 'none' | 'typewriter' | 'fade' | 'bounce' | 'slideUp' | 'glow';
+  shadowColor?: string;
+  shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
 }
 
 export interface AppliedEffect {
@@ -106,6 +110,7 @@ export interface TimelineClip {
   filters: FilterProps;
   effects: AppliedEffect[];
   transitionIn?: AppliedTransition;
+  transitionOut?: AppliedTransition;
   
   // Text specific (if type === 'text')
   textProps?: TextProperties;

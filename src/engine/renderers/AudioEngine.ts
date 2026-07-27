@@ -1,69 +1,55 @@
 import { TimelineTrack, TimelineClip } from '../types/timeline';
+import { AudioContextManager } from './audio/AudioContextManager';
+import { AudioBufferLoader } from './audio/AudioBufferLoader';
+import { AudioEnvelopeProcessor } from './audio/AudioEnvelopeProcessor';
 
 export class AudioEngine {
-  private audioCtx: AudioContext | null = null;
-  private masterGain: GainNode | null = null;
-  private activeSources: Map<string, { sourceNode: AudioBufferSourceNode | MediaElementAudioSourceNode; gainNode: GainNode }> = new Map();
-  private audioBufferCache: Map<string, AudioBuffer> = new Map();
+  private _contextManager: AudioContextManager;
+  private _bufferLoader: AudioBufferLoader;
+  private _envelopeProcessor: AudioEnvelopeProcessor;
 
-  constructor() {
-    // AudioContext will be initialized on first user gesture
-  }
+  private _masterGain: GainNode | null = null;
+  private _activeSources: Map<string, { sourceNode: AudioBufferSourceNode; gainNode: GainNode }> = new Map();
 
-  private _initAudioContext(): AudioContext {
-    if (!this.audioCtx) {
-      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      this.audioCtx = new AudioContextClass();
-      this.masterGain = this.audioCtx.createGain();
-      this.masterGain.connect(this.audioCtx.destination);
-    }
-    if (this.audioCtx.state === 'suspended') {
-      this.audioCtx.resume();
-    }
-    return this.audioCtx;
+  public constructor() {
+    this._contextManager = new AudioContextManager();
+    this._bufferLoader = new AudioBufferLoader();
+    this._envelopeProcessor = new AudioEnvelopeProcessor();
   }
 
   public getMasterDestination(): AudioNode | null {
-    if (!this.audioCtx || !this.masterGain) return null;
-    return this.masterGain;
+    const ctx = this._contextManager._getAudioContext();
+    if (!this._masterGain) {
+      this._masterGain = ctx.createGain();
+      this._masterGain.connect(ctx.destination);
+    }
+    return this._masterGain;
   }
 
   public setMasterVolume(volume: number): void {
-    if (this.masterGain && this.audioCtx) {
-      this.masterGain.gain.setValueAtTime(Math.max(0, Math.min(1, volume)), this.audioCtx.currentTime);
+    const ctx = this._contextManager._getAudioContext();
+    const master = this.getMasterDestination() as GainNode;
+    if (master) {
+      master.gain.setValueAtTime(Math.max(0, Math.min(1, volume)), ctx.currentTime);
     }
   }
 
   public async preloadAudioBuffer(url: string): Promise<AudioBuffer | null> {
     if (!url) return null;
-    if (this.audioBufferCache.has(url)) {
-      return this.audioBufferCache.get(url)!;
-    }
-
-    try {
-      const ctx = this._initAudioContext();
-      const response = await fetch(url);
-      const arrayBuffer = await response.arrayBuffer();
-      const decodedBuffer = await ctx.decodeAudioData(arrayBuffer);
-      this.audioBufferCache.set(url, decodedBuffer);
-      return decodedBuffer;
-    } catch {
-      return null;
-    }
+    return this._bufferLoader._loadAudioBuffer(url, this._contextManager);
   }
 
   /**
    * Synchronizes audio playback for all tracks at time t
    */
   public updateAudioAtTime(tracks: TimelineTrack[], currentTime: number, isPlaying: boolean): void {
-    const ctx = this._initAudioContext();
+    const ctx = this._contextManager._getAudioContext();
 
     if (!isPlaying) {
       this.stopAllAudio();
       return;
     }
 
-    // Collect active audio clips at currentTime
     const activeClipIds = new Set<string>();
 
     for (const track of tracks) {
@@ -78,99 +64,68 @@ export class AudioEngine {
       }
     }
 
-    // Stop audio for clips no longer active
-    for (const [clipId, entry] of this.activeSources.entries()) {
+    // Stop nodes that are no longer active
+    for (const [clipId, entry] of this._activeSources.entries()) {
       if (!activeClipIds.has(clipId)) {
         try {
-          if ('stop' in entry.sourceNode) {
-            entry.sourceNode.stop();
-          }
-          entry.sourceNode.disconnect();
-        } catch {
-          // ignore
-        }
-        this.activeSources.delete(clipId);
+          entry.sourceNode.stop();
+        } catch {}
+        this._activeSources.delete(clipId);
       }
     }
+  }
+
+  public stopAllAudio(): void {
+    for (const entry of this._activeSources.values()) {
+      try {
+        entry.sourceNode.stop();
+      } catch {}
+    }
+    this._activeSources.clear();
   }
 
   private _syncClipAudio(clip: TimelineClip, track: TimelineTrack, currentTime: number, ctx: AudioContext): void {
     if (clip.muted || clip.volume === 0 || !clip.sourceUrl) return;
 
     // Check if source node already running for this clip
-    if (this.activeSources.has(clip.id)) {
-      // Adjust volume / envelope
-      const entry = this.activeSources.get(clip.id)!;
-      this._applyAudioEnvelope(entry.gainNode, clip, currentTime, ctx);
+    if (this._activeSources.has(clip.id)) {
+      const entry = this._activeSources.get(clip.id)!;
+      this._envelopeProcessor._applyAudioEnvelope(entry.gainNode, clip, currentTime, ctx);
       return;
     }
 
-    // Attempt to start buffer audio
-    const buffer = this.audioBufferCache.get(clip.sourceUrl);
-    if (buffer) {
+    // Start playing buffer
+    this.preloadAudioBuffer(clip.sourceUrl).then(buffer => {
+      if (!buffer) return;
+
       try {
         const sourceNode = ctx.createBufferSource();
         sourceNode.buffer = buffer;
         sourceNode.playbackRate.value = clip.playbackRate || 1.0;
 
         const gainNode = ctx.createGain();
-        this._applyAudioEnvelope(gainNode, clip, currentTime, ctx);
+        this._envelopeProcessor._applyAudioEnvelope(gainNode, clip, currentTime, ctx);
 
         sourceNode.connect(gainNode);
-        if (this.masterGain) {
-          gainNode.connect(this.masterGain);
+        const master = this.getMasterDestination();
+        if (master) {
+          gainNode.connect(master);
         } else {
           gainNode.connect(ctx.destination);
         }
 
-        const offsetInClip = currentTime - clip.startTime;
-        const bufferOffset = clip.mediaOffset + offsetInClip;
+        const clipOffset = currentTime - clip.startTime + clip.mediaOffset;
+        sourceNode.start(0, clipOffset);
 
-        if (bufferOffset >= 0 && bufferOffset < buffer.duration) {
-          sourceNode.start(0, bufferOffset);
-          this.activeSources.set(clip.id, { sourceNode, gainNode });
-        }
-      } catch {
-        // Source start error
+        this._activeSources.set(clip.id, { sourceNode, gainNode });
+      } catch (e) {
+        console.warn('Gagal memutar audio clip:', e);
       }
-    } else {
-      // Preload buffer for next tick
-      this.preloadAudioBuffer(clip.sourceUrl);
-    }
+    });
   }
 
-  private _applyAudioEnvelope(gainNode: GainNode, clip: TimelineClip, currentTime: number, ctx: AudioContext): void {
-    const baseVolume = (clip.volume / 100) * (clip.muted ? 0 : 1);
-    const clipOffset = currentTime - clip.startTime;
-    const clipEndOffset = clip.duration - clipOffset;
-
-    let envelopeMult = 1.0;
-
-    // Fade In
-    if (clip.fadeInDuration > 0 && clipOffset < clip.fadeInDuration) {
-      envelopeMult = Math.max(0, clipOffset / clip.fadeInDuration);
-    }
-
-    // Fade Out
-    if (clip.fadeOutDuration > 0 && clipEndOffset < clip.fadeOutDuration) {
-      envelopeMult = Math.min(envelopeMult, Math.max(0, clipEndOffset / clip.fadeOutDuration));
-    }
-
-    const finalGain = baseVolume * envelopeMult;
-    gainNode.gain.setValueAtTime(finalGain, ctx.currentTime);
-  }
-
-  public stopAllAudio(): void {
-    for (const entry of this.activeSources.values()) {
-      try {
-        if ('stop' in entry.sourceNode) {
-          entry.sourceNode.stop();
-        }
-        entry.sourceNode.disconnect();
-      } catch {
-        // ignore
-      }
-    }
-    this.activeSources.clear();
+  public dispose(): void {
+    this.stopAllAudio();
+    this._contextManager._close();
   }
 }
